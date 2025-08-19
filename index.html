@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Produtividade</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    
+</head>
+<body>
+    <div class="header-container">
+        <img src="Logoferrante.png" alt="Logo da Empresa" class="logo">
+        <div class="header-right">
+            <a href="relatorio.html" class="voltar-btn">Ir para Relatórios</a>
+        </div>
+    </div>
+    
+    <h1 class="titulo-centralizado">Painel de Produtividade</h1>
+    
+    <div class="info-cards-container">
+        <div class="info-card">
+            <h3>Colaboradores com Apontamento</h3>
+            <span id="card-com-apontamento" class="card-value">0</span>
+        </div>
+        <div class="info-card">
+            <h3>Colaboradores sem Apontamento</h3>
+            <span id="card-sem-apontamento" class="card-value">0</span>
+        </div>
+        <div class="info-card parado">
+            <h3>Colaboradores Parados</h3>
+            <span id="card-parados" class="card-value">0</span>
+        </div>
+    </div>
+
+    <div class="dashboard-container">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Colaborador</th>
+                        <th>Atividade</th>
+                        <th>Data e Hora</th>
+                        <th>Motivo</th>
+                    </tr>
+                </thead>
+                <tbody id="apontamentos-tabela">
+                    </tbody>
+            </table>
+        </div>
+        <div class="chart-container">
+            <h3>Distribuição de Atividades</h3>
+            <canvas id="grafico-atividades"></canvas>
+        </div>
+    </div>
+
+    <div class="filter-container">
+        <h3>Filtrar por Data</h3>
+        <input type="date" id="filtro-data">
+        <button id="btn-filtrar">Filtrar</button>
+        <button id="btn-limpar">Limpar Filtro</button>
+    </div>
+
+    <div class="chart-container full-width">
+        <h3>Produtividade por Colaborador</h3>
+        <div class="grafico-scroll-container">
+            <canvas id="grafico-produtividade"></canvas>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
