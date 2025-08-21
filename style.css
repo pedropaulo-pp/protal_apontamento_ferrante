@@ -1,9 +1,9 @@
 :root {
     --primary-color: #007BFF;
     --secondary-color: #000000;
-    --background-color: #d8dee7; /* Cor de fundo mais suave */
+    --background-color: #d8dee7;
     --card-background: #FFFFFF;
-    --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Sombra mais sutil */
+    --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     --border-color: #E9ECEF;
     --text-color: #000000;
     --light-text-color: #db2121;
@@ -58,29 +58,30 @@ body {
     text-align: center;
     font-size: 2.5rem;
     font-weight: 700;
-    margin: 20px 0 40px;
+    margin: 40px 0 40px;
     color: var(--text-color);
 }
 
 .info-cards-container {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 25px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 95px;
     margin-bottom: 40px;
 }
 
 .info-card {
     background-color: var(--card-background);
-    padding: 30px;
-    border-radius: 12px;
+    padding: 20px;
+    border-radius: 60px;
     box-shadow: var(--card-shadow);
     text-align: center;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
+    position: relative;
 }
 
 .info-card:hover {
     transform: translateY(-8px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 8px 20px rgba(219, 0, 0, 0.12);
 }
 
 .info-card h3 {
@@ -94,15 +95,14 @@ body {
     font-weight: 700;
 }
 
-/* Alterações nas cores dos cards */
-.info-card:nth-child(1) { /* Colaboradores com Apontamento */
-    border-left: 10px solid var(--success-color);
+.info-card:nth-child(1) {
+    border-left: 15px solid var(--success-color);
 }
-.info-card:nth-child(2) { /* Colaboradores sem Apontamento */
-    border-left: 10px solid var(--secondary-color);
+.info-card:nth-child(2) {
+    border-left: 15px solid var(--secondary-color);
 }
-.info-card:nth-child(3) { /* Colaboradores Parados */
-    border-left: 10px solid var(--danger-color);
+.info-card:nth-child(3) {
+    border-left: 15px solid var(--danger-color);
 }
 .info-card:nth-child(1) .card-value { color: var(--success-color); }
 .info-card:nth-child(2) .card-value { color: var(--secondary-color); }
@@ -113,7 +113,7 @@ body {
     grid-template-columns: 2fr 1fr;
     gap: 30px;
     margin-bottom: 40px;
-    margin-top: -1px; /* Ajuste para mover o bloco todo para cima */
+    margin-top: -1px;
 }
 
 .table-container,
@@ -126,14 +126,14 @@ body {
 
 .table-container {
     overflow-x: auto;
-    overflow-y: auto; /* Adiciona a barra de rolagem vertical */
-    max-height: 600px; /* Define a altura máxima para a tabela */
+    overflow-y: auto;
+    max-height: 600px;
 }
 
 .chart-container {
     display: flex;
     flex-direction: column;
-    justify-content: flex-start; /* Alinha o conteúdo no topo */
+    justify-content: flex-start;
     margin-top: -20px;
     background-color: var(--card-background);
     padding: 30px;
@@ -166,11 +166,11 @@ th {
 }
 
 tr:nth-child(even) {
-    background-color: #FDFDFD;
+    background-color: #fafafa;
 }
 
 tr.parado-row {
-    background-color: #FFEBEB;
+    background-color: #e9b2b2;
     color: var(--danger-color);
     font-weight: bold;
 }
@@ -273,27 +273,54 @@ tr.parado-row {
     background-color: #c82333;
 }
 
-/* Adiciona barra de rolagem horizontal para o gráfico de produtividade */
 .grafico-scroll-container {
     overflow-x: auto;
     width: 100%;
-    padding-bottom: 20px; /* Espaço para a barra de rolagem */
+    padding-bottom: 20px;
 }
 
-/* Garante que o canvas não seja redimensionado */
 .grafico-scroll-container canvas {
     max-width: none !important;
+}
+
+#status-parado {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    display: none;
+}
+
+.alerta-parado-icone {
+    width: 40px;
+    height: 40px;
+}
+
+/* --- NOVO: Animação de Sombra Brilhante e Forte aplicada ao card --- */
+@keyframes brilhoAlerta {
+    0% {
+        box-shadow: 0 0 0px rgba(255, 0, 0, 0.4), var(--card-shadow);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(255, 0, 0, 0.8), 0 0 40px rgba(255, 0, 0, 0.6), 0 0 60px rgba(255, 0, 0, 0.4), var(--card-shadow);
+    }
+    100% {
+        box-shadow: 0 0 0px rgba(255, 0, 0, 0.4), var(--card-shadow);
+    }
+}
+
+.info-card.alerta-parado {
+    animation: brilhoAlerta 1.5s infinite;
 }
 
 @media (max-width: 992px) {
     .dashboard-container {
         grid-template-columns: 1fr;
-        margin-top: 0; /* Remove a margem negativa em telas menores para evitar sobreposição */
+        margin-top: 0;
     }
     .full-width {
         grid-column: auto;
     }
     .chart-container {
-        margin-top: 0; /* Garante que a margem seja removida em telas menores */
+        margin-top: 0;
     }
 }

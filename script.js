@@ -35,6 +35,7 @@ if (paginaAtual === 'index.html' || paginaAtual === '') {
     const cardComApontamento = document.getElementById('card-com-apontamento');
     const cardSemApontamento = document.getElementById('card-sem-apontamento');
     const cardParados = document.getElementById('card-parados');
+    const cardParadosContainer = document.querySelector('.info-card.parado'); // Seleciona o card específico
     const filtroDataInput = document.getElementById('filtro-data');
     const btnFiltrar = document.getElementById('btn-filtrar');
     const btnLimpar = document.getElementById('btn-limpar');
@@ -49,6 +50,7 @@ if (paginaAtual === 'index.html' || paginaAtual === '') {
         apontamentosTabela.innerHTML = '';
         let totalParados = 0;
         const contagemAtividades = {};
+        
         apontamentos.forEach(apontamento => {
             const tr = document.createElement('tr');
             if (apontamento.atividade === 'Parado') {
@@ -62,11 +64,21 @@ if (paginaAtual === 'index.html' || paginaAtual === '') {
                 <td>${apontamento.motivo || ''}</td>
             `;
             apontamentosTabela.appendChild(tr);
-            contagemAtividades[apontamento.atividade] = (contagemAtividades[apontamento.atividade] || 0) + 1;
+            contagemAtividades[`${apontamento.atividade}`] = (contagemAtividades[`${apontamento.atividade}`] || 0) + 1;
         });
         cardComApontamento.textContent = apontamentos.length;
         cardSemApontamento.textContent = TOTAL_COLABORADORES - apontamentos.length;
         cardParados.textContent = totalParados;
+
+        const statusParadoDiv = document.getElementById('status-parado');
+        if (totalParados > 0) {
+            statusParadoDiv.style.display = 'block';
+            cardParadosContainer.classList.add('alerta-parado'); // Adiciona a classe de animação ao card
+        } else {
+            statusParadoDiv.style.display = 'none';
+            cardParadosContainer.classList.remove('alerta-parado'); // Remove a classe do card
+        }
+
         atualizarGraficoPizza(contagemAtividades, apontamentos.length);
     };
 
@@ -125,14 +137,13 @@ if (paginaAtual === 'index.html' || paginaAtual === '') {
         const colaboradores = Object.keys(dadosPorColaborador);
         const atividades = ['Checklist', 'Deslocamento', 'Início da atividade', 'Parado', 'Almoço', 'Aguardando cliente'];
 
-        // Nova paleta de cores para o gráfico de barras
         const novaPaletaDeCores = {
-            'Checklist': '#9319daff', // Verde
-            'Deslocamento': '#bde62cff', // Azul
-            'Início da atividade': '#2ba0eeff', // Laranja
-            'Parado': '#db160fff', // Vermelho
-            'Almoço': '#41db33ff', // Roxo
-            'Aguardando cliente': '#ee9816ff' // Cinza
+            'Checklist': '#9319daff',
+            'Deslocamento': '#bde62cff',
+            'Início da atividade': '#2ba0eeff',
+            'Parado': '#db160fff',
+            'Almoço': '#41db33ff',
+            'Aguardando cliente': '#ee9816ff'
         };
 
         const datasets = atividades.map(atividade => {
@@ -211,7 +222,6 @@ if (paginaAtual === 'index.html' || paginaAtual === '') {
             graficoAtividades.destroy();
         }
         
-        // Nova paleta de cores para o gráfico de pizza
         const cores = ['#af1ddbff', '#bed114ff', '#e90f0fe7', '#1dc742ff', '#229ce2ff', '#607D8B', '#FF7F50'];
 
         if (graficoCanvas) {
@@ -223,9 +233,9 @@ if (paginaAtual === 'index.html' || paginaAtual === '') {
                         label: 'Contagem de Atividades',
                         data: data,
                         backgroundColor: cores,
-                        borderColor: '#574f4fff', // Borda branca nas fatias
-                        borderWidth: 2,        // Espessura da borda
-                        hoverOffset: 10        // Destaque ao passar o mouse
+                        borderColor: '#574f4fff',
+                        borderWidth: 2,
+                        hoverOffset: 10
                     }]
                 },
                 options: {
@@ -247,8 +257,7 @@ if (paginaAtual === 'index.html' || paginaAtual === '') {
         }
     };
     buscarUltimaAtividadePorColaborador();
-} 
-// Lógica para a página de RELATÓRIOS (relatorio.html)
+}
 else if (paginaAtual === 'relatorio.html') {
     const filtroColaborador = document.getElementById('filtro-colaborador');
     const filtroDataInicio = document.getElementById('filtro-data-inicio');
