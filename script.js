@@ -222,7 +222,7 @@ if (paginaAtual === 'index.html' || paginaAtual === '') {
             graficoAtividades.destroy();
         }
         
-        const cores = ['#af1ddbff', '#bed114ff', '#e90f0fe7', '#1dc742ff', '#229ce2ff', '#607D8B', '#FF7F50'];
+        const cores = ['#af1ddbff', '#24b82cff', '#e3f306e7', '#f10a0aff', '#229ce2ff', '#607D8B', '#FF7F50'];
 
         if (graficoCanvas) {
             graficoAtividades = new Chart(graficoCanvas, {
