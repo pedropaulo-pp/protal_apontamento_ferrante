@@ -6,13 +6,16 @@
     <title>Painel de Produtividade</title>
     <link rel="stylesheet" href="style.css">
     
+    <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
-    
+
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0/dist/chartjs-plugin-datalabels.min.js"></script>
-    
+
+    <!-- SheetJS (Excel Export) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
     <h1 class="titulo-centralizado">Painel de Produtividade</h1>
@@ -29,15 +32,13 @@
         <div class="info-card parado">
             <h3>Colaboradores Parados</h3>
             <span id="card-parados" class="card-value">0</span>
-            <div id="status-parado">
-               
-            </div>
+            <div id="status-parado"></div>
         </div>
     </div>
 
     <div class="dashboard-container">
         <div class="table-container">
-            <table>
+            <table id="tabela-apontamentos">
                 <thead>
                     <tr>
                         <th>Colaborador</th>
@@ -46,8 +47,7 @@
                         <th>Motivo</th>
                     </tr>
                 </thead>
-                <tbody id="apontamentos-tabela">
-                </tbody>
+                <tbody id="apontamentos-tabela"></tbody>
             </table>
         </div>
         <div class="chart-container">
@@ -57,12 +57,23 @@
     </div>
 
     <div class="filter-container">
-        <h3>Filtrar por Data</h3>
-        <input type="date" id="filtro-data">
+        <h3>Filtrar por Período</h3>
+        <label>Data Início:</label>
+        <input type="date" id="filtro-data-inicio">
+        <label>Data Fim:</label>
+        <input type="date" id="filtro-data-fim">
         <button id="btn-filtrar">Filtrar</button>
         <button id="btn-limpar">Limpar Filtro</button>
     </div>
 
+    <div class="export-container">
+        <button id="btn-exportar-excel">Exportar Produtividade para Excel</button>
+        <button id="btn-exportar-excel-detalhado">Exportar Detalhado para Excel</button>
+        <button id="btn-exportar-pdf">Exportar Histórico para PDF</button>
+
+        <button id="btn-limpar-painel" class="btn-perigo">Limpar Painel</button>
+    </div>
+    
     <div class="chart-container full-width">
         <h3>Produtividade por Colaborador</h3>
         <div class="grafico-scroll-container">

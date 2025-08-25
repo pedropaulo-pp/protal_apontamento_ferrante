@@ -7,7 +7,7 @@
     /* Paleta de Cores mais refinada e com mais contraste, para uso em todo o site. */
     --primary-color: #007BFF;
     --secondary-color: #495057;
-    --background-color: #b6b8b9;
+    --background-color: #F8F9FA; /* Cor corrigida para maior contraste */
     --card-background: #FFFFFF;
     --card-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
     --border-color: #E9ECEF;
@@ -25,6 +25,7 @@ body {
     padding: 30px; /* Adiciona espaçamento interno para o conteúdo. */
     color: var(--text-color);
     line-height: 1.6; /* Aumenta a altura da linha para melhor legibilidade. */
+    min-height: 100vh; /* **Correção para a rolagem infinita** */
 }
 
 /*
@@ -311,6 +312,11 @@ tr.parado-row td {
     margin-top: 30px;
     display: flex;
     gap: 15px;
+    background-color: var(--card-background);
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: var(--card-shadow);
+    justify-content: center;
 }
 
 .export-container button {
@@ -424,5 +430,4 @@ tr.parado-row td {
 /* Alteração específica para o título do gráfico de produtividade */
 .chart-container.full-width h3 {
     color: #0069D9; /* Cor do título do gráfico de produtividade */
-
 }
