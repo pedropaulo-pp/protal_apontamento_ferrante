@@ -22,7 +22,7 @@ const db = firebase.firestore();
 
 // ===== Utils =====
 let dadosDoRelatorio = [];
-const TOTAL_COLABORADORES = 38;
+const TOTAL_COLABORADORES = 16;
 
 const formatarTempo = (totalSegundos) => {
   if (isNaN(totalSegundos) || totalSegundos <= 0) return "00:00:00";
@@ -80,7 +80,8 @@ const renderizarStatusAtual = (ultimosApontamentos) => {
   const totalComApontamento = ultimosApontamentos.length;
   let totalParados = 0;
 
-  ultimosApontamentos.sort((a, b) => b.dataHora - a.dataHora);
+ultimosApontamentos.sort((a, b) => b.dataHoraInicio - a.dataHoraInicio);
+
 
   ultimosApontamentos.forEach(a => {
     if (a.atividade === "Parado") totalParados++;
@@ -104,8 +105,11 @@ const renderizarStatusAtual = (ultimosApontamentos) => {
 const atualizarGraficoPizzaHistorico = (todosApontamentos) => {
   if (!graficoCanvas) return;
   if (graficoAtividades) graficoAtividades.destroy();
+  // CORREÇÃO: Filtra apontamentos sem atividade antes de contar
+  const apontamentosValidos = todosApontamentos.filter(a => a.atividade);
+  
   const contagem = {};
-  todosApontamentos.forEach(a => {
+  apontamentosValidos.forEach(a => {
     contagem[a.atividade] = (contagem[a.atividade] || 0) + 1;
   });
 
@@ -138,8 +142,11 @@ const renderizarGraficoProdutividade = (todosApontamentos) => {
   if (!graficoProdutividadeCanvas) return;
   if (graficoProdutividade) graficoProdutividade.destroy();
 
+  // CORREÇÃO: Filtra apontamentos sem colaborador antes de processar
+  const apontamentosValidos = todosApontamentos.filter(a => a.colaborador);
+
   const porColaborador = {};
-  todosApontamentos.forEach(a => {
+  apontamentosValidos.forEach(a => {
     const col = a.colaborador || "—";
     const ativ = a.atividade || "—";
     const seg = converterDuracaoParaSegundos(a.duracaoFormatada);
@@ -171,39 +178,53 @@ const renderizarGraficoProdutividade = (todosApontamentos) => {
 
 // ===== Data Fetching =====
 const buscarPorPeriodo = async (dataInicioStr = null, dataFimStr = null) => {
-  let query = db.collection("apontamentos").orderBy("dataHora", "desc");
+  let query = db.collection("apontamentos_realtime").orderBy("dataHoraInicio", "desc");
+
 
   if (dataInicioStr && dataFimStr) {
     const ini = new Date(dataInicioStr); ini.setHours(0, 0, 0, 0);
     const fim = new Date(dataFimStr); fim.setHours(23, 59, 59, 999);
-    query = query.where("dataHora", ">=", ini.getTime()).where("dataHora", "<=", fim.getTime());
+ query = query.where("dataHoraInicio", ">=", ini.getTime()).where("dataHoraInicio", "<=", fim.getTime());
+
   }
 
   try {
-    const snap = await query.get();
-    if (snap.empty) {
-      limparPainelVisualmente();
-      return;
+  query.onSnapshot((snap) => {
+  if (snap.empty) {
+    limparPainelVisualmente();
+    return;
+  }
+
+  const todosApontamentosDoFiltro = [];
+  const ultimosApontamentosMap = new Map();
+
+  snap.forEach(doc => {
+    const apontamento = doc.data();
+    todosApontamentosDoFiltro.push(apontamento);
+    if (!ultimosApontamentosMap.has(apontamento.colaborador)) {
+      ultimosApontamentosMap.set(apontamento.colaborador, apontamento);
     }
+  });
 
-    const todosApontamentosDoFiltro = [];
-    const ultimosApontamentosMap = new Map();
+  const ultimosApontamentosArray = Array.from(ultimosApontamentosMap.values());
 
-    snap.forEach(doc => {
-      const apontamento = doc.data();
-      todosApontamentosDoFiltro.push(apontamento);
-      if (!ultimosApontamentosMap.has(apontamento.colaborador)) {
-        ultimosApontamentosMap.set(apontamento.colaborador, apontamento);
-      }
-    });
+// Atualiza tabela em tempo real (realtime)
+renderizarStatusAtual(ultimosApontamentosArray);
+dadosDoRelatorio = todosApontamentosDoFiltro;
 
-    const ultimosApontamentosArray = Array.from(ultimosApontamentosMap.values());
-    
-    renderizarStatusAtual(ultimosApontamentosArray);
-    atualizarGraficoPizzaHistorico(todosApontamentosDoFiltro);
-    renderizarGraficoProdutividade(todosApontamentosDoFiltro);
-    
-    dadosDoRelatorio = todosApontamentosDoFiltro;
+// 🔹 Busca histórico final (apontamentos) só para gráficos
+db.collection("apontamentos").get().then(snapshot => {
+  const todosApontamentosHistorico = [];
+  snapshot.forEach(doc => todosApontamentosHistorico.push(doc.data()));
+
+  // Chamada das funções de renderização com os dados brutos
+  // As próprias funções farão o filtro interno
+  atualizarGraficoPizzaHistorico(todosApontamentosHistorico);
+  renderizarGraficoProdutividade(todosApontamentosHistorico);
+});
+  dadosDoRelatorio = todosApontamentosDoFiltro;
+});
+
 
   } catch (e) {
     console.error("ERRO CRÍTICO AO BUSCAR DADOS:", e);
@@ -341,4 +362,26 @@ if (btnExportarPdf) btnExportarPdf.addEventListener("click", exportarHistoricoPd
 // ===== Initial Load =====
 document.addEventListener('DOMContentLoaded', (event) => {
     buscarPorPeriodo();
+
+function carregarGraficosDoDia() {
+  // Pega data atual (meia-noite de hoje e meia-noite de amanhã)
+  const agora = new Date();
+  const inicioDoDia = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 0, 0, 0, 0);
+  const fimDoDia = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23, 59, 59, 999);
+
+  db.collection("apontamentos")
+    .where("dataHoraInicio", ">=", inicioDoDia.getTime())
+    .where("dataHoraInicio", "<=", fimDoDia.getTime())
+    .get()
+    .then(snapshot => {
+      const apontamentosHoje = [];
+      snapshot.forEach(doc => apontamentosHoje.push(doc.data()));
+
+      // 🔹 Repassa só os do dia atual pros gráficos
+      atualizarGraficoPizzaHistorico(apontamentosHoje);
+      renderizarGraficoProdutividade(apontamentosHoje);
+    });
+}
+
+
 });
