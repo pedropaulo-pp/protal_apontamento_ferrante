@@ -1,5 +1,5 @@
 // =================================================================
-// SCRIPT.JS - VERSÃO FINAL COM EXCLUSÃO DE DADOS NO FIREBASE
+// SCRIPT.JS - VERSÃO FINAL CORRIGIDA
 // =================================================================
 
 // ===== Firebase =====
@@ -16,7 +16,7 @@ const firebaseConfig = {
 try {
     firebase.initializeApp(firebaseConfig);
 } catch(e) {
-    console.error("Firebase já foi inicializado.");
+    // Firebase já foi inicializado, o que é normal em ambientes de desenvolvimento com recarregamento.
 }
 const db = firebase.firestore();
 
@@ -67,10 +67,15 @@ if (window.ChartDataLabels) {
   Chart.register(ChartDataLabels);
 }
 
-const ATIVIDADES = ["Checklist", "Deslocamento", "Início da atividade", "Parado", "Almoço", "Aguardando cliente"];
+const ATIVIDADES = ["Checklist", "Deslocamento", "Em Atividade", "Parado", "Almoço", "Aguardando cliente", "Carregamento"];
 const CORES_ATIVIDADES = {
-  "Checklist": "#9319daff", "Deslocamento": "#bde62cff", "Início da atividade": "#2ba0eeff",
-  "Parado": "#db160fff", "Almoço": "#41db33ff", "Aguardando cliente": "#ee9816ff"
+ "Checklist": "#8e00e0ff", 
+"Deslocamento": "#d1d400ff", 
+"Em Atividade": "#38c202ff",
+"Parado": "#ff0800ff", 
+"Almoço": "#0594e7ff", 
+"Aguardando cliente": "#fd7a00ff", 
+  "Carregamento": "#5a5a59ff",
 };
 
 // ===== Render Functions =====
@@ -80,8 +85,7 @@ const renderizarStatusAtual = (ultimosApontamentos) => {
   const totalComApontamento = ultimosApontamentos.length;
   let totalParados = 0;
 
-ultimosApontamentos.sort((a, b) => b.dataHoraInicio - a.dataHoraInicio);
-
+  ultimosApontamentos.sort((a, b) => b.dataHoraInicio - a.dataHoraInicio);
 
   ultimosApontamentos.forEach(a => {
     if (a.atividade === "Parado") totalParados++;
@@ -102,15 +106,19 @@ ultimosApontamentos.sort((a, b) => b.dataHoraInicio - a.dataHoraInicio);
   if (cardParadosContainer) cardParadosContainer.classList.toggle("alerta-parado", totalParados > 0);
 };
 
-const atualizarGraficoPizzaHistorico = (todosApontamentos) => {
+const atualizarGraficoPizzaHistorico = (apontamentos) => {
   if (!graficoCanvas) return;
   if (graficoAtividades) graficoAtividades.destroy();
-  // CORREÇÃO: Filtra apontamentos sem atividade antes de contar
-  const apontamentosValidos = todosApontamentos.filter(a => a.atividade);
+  
+  const apontamentosValidos = apontamentos.filter(a => a.atividade);
   
   const contagem = {};
   apontamentosValidos.forEach(a => {
-    contagem[a.atividade] = (contagem[a.atividade] || 0) + 1;
+    let atividadePadronizada = a.atividade;
+    if (a.atividade && a.atividade.toLowerCase().trim() === "início da atividade") {
+      atividadePadronizada = "Em Atividade";
+    }
+    contagem[atividadePadronizada] = (contagem[atividadePadronizada] || 0) + 1;
   });
 
   const labels = Object.keys(contagem);
@@ -138,17 +146,15 @@ const atualizarGraficoPizzaHistorico = (todosApontamentos) => {
   });
 };
 
-const renderizarGraficoProdutividade = (todosApontamentos) => {
+const renderizarGraficoProdutividade = (apontamentos) => {
   if (!graficoProdutividadeCanvas) return;
   if (graficoProdutividade) graficoProdutividade.destroy();
 
-  // CORREÇÃO: Filtra apontamentos sem colaborador antes de processar
-  const apontamentosValidos = todosApontamentos.filter(a => a.colaborador);
-
+  const apontamentosValidos = apontamentos.filter(a => a.colaborador);
   const porColaborador = {};
   apontamentosValidos.forEach(a => {
     const col = a.colaborador || "—";
-    const ativ = a.atividade || "—";
+    const ativ = (a.atividade && a.atividade.toLowerCase().trim() === "início da atividade") ? "Em Atividade" : (a.atividade || "—");
     const seg = converterDuracaoParaSegundos(a.duracaoFormatada);
 
     if (!porColaborador[col]) {
@@ -177,64 +183,71 @@ const renderizarGraficoProdutividade = (todosApontamentos) => {
 };
 
 // ===== Data Fetching =====
-const buscarPorPeriodo = async (dataInicioStr = null, dataFimStr = null) => {
-  let query = db.collection("apontamentos_realtime").orderBy("dataHoraInicio", "desc");
 
+const carregarDadosDoPainel = async (dataInicioStr = null, dataFimStr = null) => {
+  limparPainelVisualmente();
 
+  let inicio, fim;
   if (dataInicioStr && dataFimStr) {
-    const ini = new Date(dataInicioStr); ini.setHours(0, 0, 0, 0);
-    const fim = new Date(dataFimStr); fim.setHours(23, 59, 59, 999);
- query = query.where("dataHoraInicio", ">=", ini.getTime()).where("dataHoraInicio", "<=", fim.getTime());
-
+    inicio = new Date(dataInicioStr);
+    inicio.setHours(0, 0, 0, 0);
+    fim = new Date(dataFimStr);
+    fim.setHours(23, 59, 59, 999);
+  } else {
+    const hoje = new Date();
+    inicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 0, 0, 0, 0);
+    fim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59, 999);
   }
+
+  // Restaura a busca em tempo real para a tabela.
+  let queryStatus = db.collection("apontamentos_realtime")
+    .where("dataHoraInicio", ">=", inicio.getTime())
+    .where("dataHoraInicio", "<=", fim.getTime())
+    .orderBy("dataHoraInicio", "desc");
+
+  queryStatus.onSnapshot((snap) => {
+    if (snap.empty) {
+      renderizarStatusAtual([]);
+      return;
+    }
+    const ultimosApontamentosMap = new Map();
+    snap.forEach(doc => {
+      const apontamento = doc.data();
+      if (!ultimosApontamentosMap.has(apontamento.colaborador)) {
+        ultimosApontamentosMap.set(apontamento.colaborador, apontamento);
+      }
+    });
+    renderizarStatusAtual(Array.from(ultimosApontamentosMap.values()));
+  }, (error) => console.error("Erro ao buscar status em tempo real:", error));
 
   try {
-  query.onSnapshot((snap) => {
-  if (snap.empty) {
-    limparPainelVisualmente();
-    return;
-  }
+ let queryGraficos = db.collection("apontamentos")
+  .where("dataHora", ">=", inicio.getTime())
+  .where("dataHora", "<=", fim.getTime());
 
-  const todosApontamentosDoFiltro = [];
-  const ultimosApontamentosMap = new Map();
-
-  snap.forEach(doc => {
-    const apontamento = doc.data();
-    todosApontamentosDoFiltro.push(apontamento);
-    if (!ultimosApontamentosMap.has(apontamento.colaborador)) {
-      ultimosApontamentosMap.set(apontamento.colaborador, apontamento);
+    const snapshot = await queryGraficos.get();
+    
+    const apontamentosDoPeriodo = [];
+    snapshot.forEach(doc => apontamentosDoPeriodo.push(doc.data()));
+    
+    dadosDoRelatorio = apontamentosDoPeriodo;
+    
+    if (apontamentosDoPeriodo.length > 0) {
+        atualizarGraficoPizzaHistorico(apontamentosDoPeriodo);
+        renderizarGraficoProdutividade(apontamentosDoPeriodo);
+    } else {
+        console.log("Nenhum dado histórico encontrado para os gráficos no período selecionado.");
     }
-  });
-
-  const ultimosApontamentosArray = Array.from(ultimosApontamentosMap.values());
-
-// Atualiza tabela em tempo real (realtime)
-renderizarStatusAtual(ultimosApontamentosArray);
-dadosDoRelatorio = todosApontamentosDoFiltro;
-
-// 🔹 Busca histórico final (apontamentos) só para gráficos
-db.collection("apontamentos").get().then(snapshot => {
-  const todosApontamentosHistorico = [];
-  snapshot.forEach(doc => todosApontamentosHistorico.push(doc.data()));
-
-  // Chamada das funções de renderização com os dados brutos
-  // As próprias funções farão o filtro interno
-  atualizarGraficoPizzaHistorico(todosApontamentosHistorico);
-  renderizarGraficoProdutividade(todosApontamentosHistorico);
-});
-  dadosDoRelatorio = todosApontamentosDoFiltro;
-});
-
-
   } catch (e) {
-    console.error("ERRO CRÍTICO AO BUSCAR DADOS:", e);
+    console.error("ERRO CRÍTICO AO BUSCAR DADOS PARA OS GRÁFICOS:", e);
   }
 };
+
 
 // ===== Funções de Controle e Exportação =====
 
 const limparPainelVisualmente = () => {
-    if(apontamentosTabela) apontamentosTabela.innerHTML = '<tr><td colspan="4" style="text-align: center;">Nenhum dado encontrado.</td></tr>';
+    if(apontamentosTabela) apontamentosTabela.innerHTML = '<tr><td colspan="4" style="text-align: center;">Nenhum dado encontrado para o período.</td></tr>';
     if(cardComApontamento) cardComApontamento.textContent = "0";
     if(cardSemApontamento) cardSemApontamento.textContent = TOTAL_COLABORADORES;
     if(cardParados) cardParados.textContent = "0";
@@ -244,56 +257,39 @@ const limparPainelVisualmente = () => {
     dadosDoRelatorio = [];
 };
 
-// **INÍCIO: FUNÇÃO DE EXCLUSÃO PERMANENTE**
 const zerarRegistrosDoBanco = async () => {
-  // 1. Confirmação dupla para segurança
   const confirmacao1 = confirm("ATENÇÃO: AÇÃO IRREVERSÍVEL!\n\nVocê tem certeza que deseja apagar PERMANENTEMENTE todos os registros de apontamento do banco de dados?");
-  if (!confirmacao1) {
-    alert("Operação cancelada.");
-    return;
-  }
+  if (!confirmacao1) return alert("Operação cancelada.");
 
   const confirmacao2 = confirm("CONFIRMAÇÃO FINAL:\n\nTodos os dados de produtividade serão perdidos. Esta ação não pode ser desfeita. Deseja continuar?");
-  if (!confirmacao2) {
-    alert("Operação cancelada.");
-    return;
-  }
+  if (!confirmacao2) return alert("Operação cancelada.");
 
   alert("Iniciando a exclusão de todos os registros. Por favor, aguarde o aviso de conclusão.");
 
   try {
     const snapshot = await db.collection("apontamentos").get();
-
     if (snapshot.empty) {
-      alert("O banco de dados já está vazio.");
+      alert("O banco de dados 'apontamentos' já está vazio.");
       limparPainelVisualmente();
       return;
     }
-
-    // Apaga os documentos em lotes para evitar sobrecarga
     const batch = db.batch();
-    snapshot.docs.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-
+    snapshot.docs.forEach(doc => batch.delete(doc.ref));
     await batch.commit();
-
     limparPainelVisualmente();
-    alert(`SUCESSO!\n\n${snapshot.size} registros foram apagados permanentemente do banco de dados.`);
-
+    alert(`SUCESSO!\n\n${snapshot.size} registros foram apagados permanentemente do banco de dados 'apontamentos'.`);
   } catch (error) {
     console.error("Erro ao apagar registros:", error);
     alert("Ocorreu um erro ao apagar os registros. Verifique o console (F12) e as regras de segurança do seu Firestore.");
   }
 };
-// **FIM: FUNÇÃO DE EXCLUSÃO PERMANENTE**
 
 const exportarProdutividadeExcel = () => {
-    if (dadosDoRelatorio.length === 0) return alert("Nenhum dado para exportar.");
+    if (dadosDoRelatorio.length === 0) return alert("Nenhum dado para exportar. Selecione um período com dados.");
     const dadosPorColaborador = {};
     dadosDoRelatorio.forEach(a => {
         const col = a.colaborador || "—";
-        const ativ = a.atividade || "—";
+        const ativ = (a.atividade && a.atividade.toLowerCase().trim() === "início da atividade") ? "Em Atividade" : (a.atividade || "—");
         const seg = converterDuracaoParaSegundos(a.duracaoFormatada);
         if (!dadosPorColaborador[col]) {
             dadosPorColaborador[col] = {};
@@ -315,10 +311,10 @@ const exportarProdutividadeExcel = () => {
 };
 
 const exportarDetalhadoExcel = () => {
-    if (dadosDoRelatorio.length === 0) return alert("Nenhum dado para exportar.");
+    if (dadosDoRelatorio.length === 0) return alert("Nenhum dado para exportar. Selecione um período com dados.");
     const dadosParaExportar = dadosDoRelatorio.map(a => ({
         Colaborador: a.colaborador || "—",
-        Atividade: a.atividade || "—",
+        Atividade: (a.atividade && a.atividade.toLowerCase().trim() === "início da atividade") ? "Em Atividade" : (a.atividade || "—"),
         "Data e Hora": a.dataHoraFormatada || "—",
         "Duração": a.duracaoFormatada || "00:00:00",
         Motivo: a.motivo || "—"
@@ -326,11 +322,11 @@ const exportarDetalhadoExcel = () => {
     const ws = XLSX.utils.json_to_sheet(dadosParaExportar);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Apontamentos Detalhados");
-    XLSX.writeFile(wb, "Apontamentos_Detalhados.xlsx");
+    XLSX.writeFile(wb, "Apontamentos_Detalhado.xlsx");
 };
 
 const exportarHistoricoPdf = () => {
-    if (dadosDoRelatorio.length === 0) return alert("Nenhum dado para exportar.");
+    if (dadosDoRelatorio.length === 0) return alert("Nenhum dado para exportar. Selecione um período com dados.");
     const tabelaParaImpressao = document.createElement('table');
     tabelaParaImpressao.innerHTML = apontamentosTabela.innerHTML;
     tabelaParaImpressao.insertAdjacentHTML('afterbegin', '<thead>' + document.querySelector('#tabela-apontamentos thead').innerHTML + '</thead>');
@@ -345,43 +341,56 @@ const exportarHistoricoPdf = () => {
 };
 
 // ===== Event Listeners =====
-if (btnFiltrar) btnFiltrar.addEventListener("click", () => buscarPorPeriodo(filtroDataInicio.value, filtroDataFim.value));
-if (btnLimpar) btnLimpar.addEventListener("click", () => {
-    if(filtroDataInicio) filtroDataInicio.value = "";
-    if(filtroDataFim) filtroDataFim.value = "";
-    buscarPorPeriodo();
-});
+if (btnFiltrar) {
+    btnFiltrar.addEventListener("click", () => {
+        const dataInicio = filtroDataInicio.value;
+        const dataFim = filtroDataFim.value;
+        if (!dataInicio || !dataFim) {
+            return alert("Por favor, selecione a data de início e a data de fim para filtrar.");
+        }
+        carregarDadosDoPainel(dataInicio, dataFim);
+    });
+}
 
-// **CONEXÃO DO BOTÃO COM A FUNÇÃO DE EXCLUSÃO**
+if (btnLimpar) {
+    btnLimpar.addEventListener("click", () => {
+        if(filtroDataInicio) filtroDataInicio.value = "";
+        if(filtroDataFim) filtroDataFim.value = "";
+        // Ao limpar, volta a carregar os dados do dia atual
+        carregarDadosDoPainel();
+    });
+}
+
 if (btnLimparPainel) btnLimparPainel.addEventListener("click", zerarRegistrosDoBanco);
-
 if (btnExportarExcel) btnExportarExcel.addEventListener("click", exportarProdutividadeExcel);
 if (btnExportarExcelDetalhado) btnExportarExcelDetalhado.addEventListener("click", exportarDetalhadoExcel);
 if (btnExportarPdf) btnExportarPdf.addEventListener("click", exportarHistoricoPdf);
 
 // ===== Initial Load =====
-document.addEventListener('DOMContentLoaded', (event) => {
-    buscarPorPeriodo();
+document.addEventListener('DOMContentLoaded', () => {
+    carregarDadosDoPainel();
 
-function carregarGraficosDoDia() {
-  // Pega data atual (meia-noite de hoje e meia-noite de amanhã)
+function atualizarGraficosDoDia() {
   const agora = new Date();
-  const inicioDoDia = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 0, 0, 0, 0);
-  const fimDoDia = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23, 59, 59, 999);
+  const inicio = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 0,0,0,0);
+  const fim    = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23,59,59,999);
 
   db.collection("apontamentos")
-    .where("dataHoraInicio", ">=", inicioDoDia.getTime())
-    .where("dataHoraInicio", "<=", fimDoDia.getTime())
+    .where("dataHora", ">=", inicio.getTime())
+    .where("dataHora", "<=", fim.getTime())
     .get()
     .then(snapshot => {
       const apontamentosHoje = [];
       snapshot.forEach(doc => apontamentosHoje.push(doc.data()));
 
-      // 🔹 Repassa só os do dia atual pros gráficos
       atualizarGraficoPizzaHistorico(apontamentosHoje);
       renderizarGraficoProdutividade(apontamentosHoje);
-    });
+    })
+    .catch(err => console.error("Erro ao atualizar gráficos:", err));
 }
+document.getElementById("atualizar-paineis").addEventListener("click", () => {
+  atualizarGraficosDoDia();
+});
 
 
 });

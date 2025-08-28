@@ -7,12 +7,12 @@
     /* Paleta de Cores mais refinada e com mais contraste, para uso em todo o site. */
     --primary-color: #007BFF;
     --secondary-color: #495057;
-    --background-color: #F8F9FA; /* Cor corrigida para maior contraste */
+    --background-color: #c5d8e0; /* Cor corrigida para maior contraste */
     --card-background: #FFFFFF;
     --card-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
     --border-color: #E9ECEF;
     --text-color: #080808;
-    --light-text-color: #adb5bd;
+    --light-text-color: #baadbd;
     --success-color: #28a745;
     --danger-color: #dc3545;
 }
@@ -169,11 +169,17 @@ body {
   Estilo da Tabela
   ========================================
 */
+#tabela-apontamentos {
+    /* NOVO: Garante que as colunas da tabela tenham uma largura fixa. */
+    table-layout: fixed;
+    /* Define o espaçamento entre as linhas, mantido do seu código original. */
+    border-spacing: 0 10px;
+}
+
 table {
     /* Estilo geral da tabela. */
     width: 100%;
     border-collapse: separate;
-    border-spacing: 0 10px; /* Adiciona espaçamento entre as linhas. */
 }
 
 th {
@@ -196,6 +202,14 @@ td {
     border-top: 1px solid var(--border-color);
     border-bottom: 1px solid var(--border-color);
     border-left: 5px solid transparent;
+}
+
+/* NOVO: Define a largura de cada coluna para que fiquem uniformes. */
+#tabela-apontamentos th,
+#tabela-apontamentos td {
+    width: 25%;
+    text-align: left;
+    padding: 15px;
 }
 
 td:first-child {
@@ -430,4 +444,5 @@ tr.parado-row td {
 /* Alteração específica para o título do gráfico de produtividade */
 .chart-container.full-width h3 {
     color: #0069D9; /* Cor do título do gráfico de produtividade */
+    
 }
