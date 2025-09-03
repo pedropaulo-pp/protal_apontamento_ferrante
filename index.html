@@ -6,18 +6,16 @@
     <title>Painel de Produtividade</title>
     <link rel="stylesheet" href="style.css">
     
-    <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
 
-    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0/dist/chartjs-plugin-datalabels.min.js"></script>
 
-    <!-- SheetJS (Excel Export) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
+    
 
     
     <div class="info-cards-container">
@@ -38,17 +36,19 @@
 
     <div class="dashboard-container">
         <div class="table-container">
-            <table id="tabela-apontamentos">
-                <thead>
-                    <tr>
-                        <th>Colaborador</th>
-                        <th>Atividade</th>
-                        <th>Data e Hora</th>
-                        <th>Motivo</th>
-                    </tr>
-                </thead>
-                <tbody id="apontamentos-tabela"></tbody>
-            </table>
+          <table id="tabela-apontamentos">
+  <thead>
+    <tr>
+      <th>Cliente</th>
+      <th>Colaborador</th>
+      <th>Atividade</th>
+      <th>Data e Hora</th>
+      <th>Motivo</th>
+    </tr>
+  </thead>
+  <tbody id="apontamentos-tabela"></tbody>
+</table>
+
         </div>
         <div class="chart-container">
             <h3>Distribuição de Atividades</h3>
@@ -71,7 +71,7 @@
         <button id="btn-exportar-excel-detalhado">Exportar Detalhado para Excel</button>
         <button id="btn-exportar-pdf">Exportar Histórico para PDF</button>
         <button id="atualizar-paineis">🔄 Atualizar Painéis</button>
-        <button id="btn-limpar-painel" class="btn-perigo">Limpar Painel</button>
+        <button id="btn-apagar-tudo" class="btn-perigo">Apagar Todos os Apontamentos</button>
     </div>
     
     <div class="chart-container full-width">
@@ -81,6 +81,8 @@
         </div>
     </div>
     
+    
     <script src="script.js"></script>
+    
 </body>
 </html>
