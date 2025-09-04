@@ -151,7 +151,8 @@ body {
     flex-direction: column;
     justify-content: flex-start;
     /* CORREÇÃO para o problema da rolagem infinita */
-    max-height: 400px;
+    max-height: 500px; /* Aumentado para dar mais espaço ao gráfico */
+    margin-top: 20px; /* Adicionado para empurrar o gráfico para baixo */
 }
 
 .full-width {

@@ -74,6 +74,9 @@ const CORES_ATIVIDADES = {
  "Carregamento": "#5a5a59ff",
 };
 
+// Register the datalabels plugin
+Chart.register(ChartDataLabels);
+
 // ===== Render Functions =====
 const renderizarStatusAtual = (ultimosApontamentos) => {
   if (!apontamentosTabela) return;
@@ -142,7 +145,7 @@ const atualizarGraficoPizzaHistorico = (apontamentos) => {
     }
 
     graficoAtividades = new Chart(graficoAtividadesCanvas, {
-        type: 'doughnut',
+        type: 'pie',
         data: {
             labels: labels,
             datasets: [{
@@ -167,6 +170,21 @@ const atualizarGraficoPizzaHistorico = (apontamentos) => {
                             }
                             return label;
                         }
+                    }
+                },
+                datalabels: {
+                    formatter: (value, ctx) => {
+                        let sum = 0;
+                        let dataArr = ctx.chart.data.datasets[0].data;
+                        dataArr.map(data => {
+                            sum += data;
+                        });
+                        let percentage = (value * 100 / sum).toFixed(2) + "%";
+                        return percentage;
+                    },
+                    color: '#fff',
+                    font: {
+                        weight: 'bold'
                     }
                 }
             }
@@ -210,7 +228,7 @@ const renderizarGraficoProdutividade = (apontamentos) => {
     options: {
       responsive: true,
       scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => formatarTempo(v) } } },
-      plugins: { tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${formatarTempo(ctx.parsed.y)}` } } }
+      plugins: { tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}` } } }
     }
   });
 };
