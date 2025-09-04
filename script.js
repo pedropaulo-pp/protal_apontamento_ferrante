@@ -66,11 +66,11 @@ let graficoProdutividade;
 const ATIVIDADES = ["Checklist", "Deslocamento", "Em Atividade", "Parado", "Almoço", "Aguardando cliente", "Carregamento"];
 const CORES_ATIVIDADES = {
  "Checklist": "#8e00e0ff", 
- "Deslocamento": "#d1d400ff", 
+ "Deslocamento": "#d3c610ff", 
  "Em Atividade": "#38c202ff",
- "Parado": "#ff0800ff", 
+ "Parado": "#da1912ff", 
  "Almoço": "#0594e7ff", 
- "Aguardando cliente": "#fd7a00ff", 
+ "Aguardando cliente": "#fc7a00ff", 
  "Carregamento": "#5a5a59ff",
 };
 
@@ -101,9 +101,11 @@ const renderizarStatusAtual = (ultimosApontamentos) => {
 
     const tr = document.createElement("tr");
 
-    if (atividade.toLowerCase() === "aguardando cliente") {
-      tr.style.backgroundColor = "#fd7a00";
-      tr.style.color = "#fff";
+    // Adicionar classes CSS baseadas na atividade
+    if (atividade.toLowerCase() === "parado") {
+      tr.classList.add("parado-row");
+    } else if (atividade.toLowerCase() === "aguardando cliente") {
+      tr.classList.add("aguardando-cliente-row");
     }
 
     tr.innerHTML = `
@@ -182,7 +184,7 @@ const atualizarGraficoPizzaHistorico = (apontamentos) => {
                         let percentage = (value * 100 / sum).toFixed(2) + "%";
                         return percentage;
                     },
-                    color: '#fff',
+                    color: '#080808ff',
                     font: {
                         weight: 'bold'
                     }
@@ -228,7 +230,7 @@ const renderizarGraficoProdutividade = (apontamentos) => {
     options: {
       responsive: true,
       scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => formatarTempo(v) } } },
-      plugins: { tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}` } } }
+      plugins: { tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${formatarTempo(ctx.parsed.y)}` } } }
     }
   });
 };
@@ -311,7 +313,6 @@ const carregarDadosDoPainel = async (dataInicioStr = null, dataFimStr = null) =>
     console.error("Erro ao buscar dados históricos:", error);
   }
 };
-
 
 const zerarRegistrosDoBanco = () => {
   if (confirm("ATENÇÃO: Você tem certeza que deseja apagar TODOS os registros de (apontamentos_realtime) e (apontamentos)? Esta ação é irreversível.")) {
@@ -421,7 +422,6 @@ const exportarHistoricoPdf = () => {
     win.document.close();
     win.print();
 };
-
 
 if (btnFiltrar) {
     btnFiltrar.addEventListener("click", () => {
