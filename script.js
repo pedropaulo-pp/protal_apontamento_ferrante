@@ -1,5 +1,5 @@
 // =================================================================
-// SCRIPT.JS - VERSÃO FINAL COM TODAS AS CORREÇÕES
+// SCRIPT.JS - VERSÃO FINAL COM ANIMAÇÃO DE FATIA
 // =================================================================
 
 // ===== Firebase =====
@@ -23,7 +23,12 @@ const db = firebase.firestore();
 // ===== Utils =====
 let dadosDoRelatorio = [];
 const TOTAL_COLABORADORES = 16;
-let unsubscribeHistorico = null; // Variável para controlar o listener do histórico
+let unsubscribeHistorico = null;
+// ==================================================
+// ===== VARIÁVEIS PARA A NOVA ANIMAÇÃO =====
+// ==================================================
+let animacaoIntervalo = null; // Guarda o intervalo da animação para podermos pará-lo
+let corOriginalMaiorFatia = null; // Guarda a cor original da fatia
 
 const formatarTempo = (totalSegundos) => {
   if (isNaN(totalSegundos) || totalSegundos <= 0) return "00:00:00";
@@ -129,9 +134,19 @@ const renderizarStatusAtual = (ultimosApontamentos) => {
   if (cardParadosContainer) cardParadosContainer.classList.toggle("alerta-parado", totalParados > 0);
 };
 
+// ==================================================
+// ===== FUNÇÃO ATUALIZADA COM A NOVA ANIMAÇÃO =====
+// ==================================================
 const atualizarGraficoPizzaHistorico = (apontamentos) => {
     if (!graficoAtividadesCanvas) return;
-    if (graficoAtividades) graficoAtividades.destroy();
+
+    // Para a animação anterior antes de redesenhar
+    if (animacaoIntervalo) {
+        clearInterval(animacaoIntervalo);
+    }
+    if (graficoAtividades) {
+        graficoAtividades.destroy();
+    }
     
     const contagem = {};
     apontamentos.forEach(a => {
@@ -147,15 +162,20 @@ const atualizarGraficoPizzaHistorico = (apontamentos) => {
     const backgroundColors = labels.map(label => CORES_ATIVIDADES[label] || '#607D8B');
 
     if (labels.length === 0) {
-        if (graficoAtividades) graficoAtividades.destroy();
-        return;
+        return; // Sai da função se não houver dados
     }
 
     graficoAtividades = new Chart(graficoAtividadesCanvas, {
         type: 'pie',
         data: {
             labels: labels,
-            datasets: [{ data: data, backgroundColor: backgroundColors }]
+            datasets: [{
+                data: data,
+                backgroundColor: backgroundColors,
+                // Adiciona uma borda para destacar melhor
+                borderColor: '#ffffff',
+                borderWidth: 2
+            }]
         },
         options: {
             responsive: true, maintainAspectRatio: false,
@@ -172,7 +192,40 @@ const atualizarGraficoPizzaHistorico = (apontamentos) => {
             }
         },
     });
+
+    // --- Lógica da Animação ---
+    // 1. Encontra o índice da maior fatia
+    let indiceMaiorFatia = 0;
+    for (let i = 1; i < data.length; i++) {
+        if (data[i] > data[indiceMaiorFatia]) {
+            indiceMaiorFatia = i;
+        }
+    }
+
+    // 2. Guarda a cor original
+    corOriginalMaiorFatia = graficoAtividades.data.datasets[0].backgroundColor[indiceMaiorFatia];
+    const corBrilhante = '#FFFF99'; // Um amarelo claro para o efeito de brilho
+
+    // 3. Cria a animação de piscar
+    let estaBrilhando = false;
+    animacaoIntervalo = setInterval(() => {
+        // Pega a cor atual da fatia (pode ter sido alterada)
+        const coresAtuais = graficoAtividades.data.datasets[0].backgroundColor;
+        
+        if (estaBrilhando) {
+            // Volta para a cor original
+            coresAtuais[indiceMaiorFatia] = corOriginalMaiorFatia;
+        } else {
+            // Aplica a cor brilhante
+            coresAtuais[indiceMaiorFatia] = corBrilhante;
+        }
+        
+        // Inverte o estado e atualiza o gráfico
+        estaBrilhando = !estaBrilhando;
+        graficoAtividades.update();
+    }, 700); // Pisca a cada 700ms
 };
+
 
 const renderizarGraficoProdutividade = (apontamentos) => {
   if (!graficoProdutividadeCanvas) return;
@@ -214,7 +267,7 @@ const renderizarGraficoProdutividade = (apontamentos) => {
   });
 };
 
-// ===== Data Fetching e Event Listeners =====
+// ... (O restante do seu código permanece exatamente o mesmo até o final)
 const carregarDadosDoPainel = (dataInicioStr = null, dataFimStr = null) => {
   limparPainelVisualmente();
   let inicio, fim;
@@ -227,7 +280,6 @@ const carregarDadosDoPainel = (dataInicioStr = null, dataFimStr = null) => {
     fim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59, 999);
   }
 
-  // Realtime - SEM FILTRO DE DATA, para pegar o último status de TODOS
   db.collection("apontamentos_realtime")
     .orderBy("dataHoraClique", "desc")
     .onSnapshot((snap) => {
@@ -243,13 +295,10 @@ const carregarDadosDoPainel = (dataInicioStr = null, dataFimStr = null) => {
     console.error("Erro ao buscar status em tempo real:", error);
   });
   
-  // Histórico - AGORA EM TEMPO REAL (onSnapshot)
   if (unsubscribeHistorico) {
     unsubscribeHistorico();
   }
 
-  // A consulta agora é feita sem filtro de data para evitar o erro de índice do Firebase.
-  // O filtro será aplicado no navegador.
   unsubscribeHistorico = db.collection("apontamentos")
     .onSnapshot((snapshot) => {
       const todosApontamentos = [];
@@ -257,7 +306,6 @@ const carregarDadosDoPainel = (dataInicioStr = null, dataFimStr = null) => {
         todosApontamentos.push(doc.data());
       });
 
-      // Filtra os apontamentos pelo período selecionado AQUI, no navegador.
       const apontamentosDoPeriodo = todosApontamentos.filter(dado => {
           if (!dado.dataRegistro) return false;
           const dataDoc = new Date(dado.dataRegistro.replace(' ', 'T'));
@@ -278,7 +326,6 @@ const carregarDadosDoPainel = (dataInicioStr = null, dataFimStr = null) => {
   });
 };
 
-// ===== Funções de Exportação e Limpeza =====
 const zerarRegistrosDoBanco = () => {
   if (confirm("ATENÇÃO: Você tem certeza que deseja apagar TODOS os registros de (apontamentos_realtime) e (apontamentos)? Esta ação é irreversível.")) {
     const apontamentosRealtimeRef = db.collection("apontamentos_realtime");
@@ -404,7 +451,6 @@ const exportarHistoricoPdf = () => {
     doc.save("historico_filtrado.pdf");
 };
 
-// ===== Event Listeners (Conexão dos botões) =====
 if (btnFiltrar) {
     btnFiltrar.addEventListener("click", () => {
         const dataInicio = filtroDataInicio.value;
@@ -427,8 +473,6 @@ if (btnLimpar) {
 if (btnLimparPainel) btnLimparPainel.addEventListener("click", zerarRegistrosDoBanco);
 if (btnExportarExcel) btnExportarExcel.addEventListener("click", exportarProdutividadeExcel);
 if (btnExportarExcelDetalhado) btnExportarExcelDetalhado.addEventListener("click", exportarDetalhadoExcel);
-
-// CORREÇÃO DO ERRO DE DIGITAÇÃO APLICADA AQUI
 if (btnExportarPdf) {
     btnExportarPdf.addEventListener("click", exportarHistoricoPdf);
 }
