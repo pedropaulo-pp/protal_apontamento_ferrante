@@ -1,5 +1,5 @@
 // =================================================================
-// SCRIPT.JS - VERSÃO FINAL CORRIGIDA
+// SCRIPT.JS - VERSÃO FINAL COM TODAS AS CORREÇÕES
 // =================================================================
 
 // ===== Firebase =====
@@ -16,13 +16,14 @@ const firebaseConfig = {
 try {
     firebase.initializeApp(firebaseConfig);
 } catch(e) {
-    // Firebase já foi inicializado, o que é normal em ambientes de desenvolvimento com recarregamento.
+    // Firebase já foi inicializado
 }
 const db = firebase.firestore();
 
 // ===== Utils =====
 let dadosDoRelatorio = [];
 const TOTAL_COLABORADORES = 16;
+let unsubscribeHistorico = null; // Variável para controlar o listener do histórico
 
 const formatarTempo = (totalSegundos) => {
   if (isNaN(totalSegundos) || totalSegundos <= 0) return "00:00:00";
@@ -74,52 +75,56 @@ const CORES_ATIVIDADES = {
  "Carregamento": "#5a5a59ff",
 };
 
-// Register the datalabels plugin
 Chart.register(ChartDataLabels);
 
 // ===== Render Functions =====
 const renderizarStatusAtual = (ultimosApontamentos) => {
   if (!apontamentosTabela) return;
   apontamentosTabela.innerHTML = "";
-  const totalComApontamento = ultimosApontamentos.length;
+  
+  let totalComApontamentoHoje = 0;
   let totalParados = 0;
 
-  ultimosApontamentos.sort((a, b) => {
-    const tA = a.dataHoraClique || 0;
-    const tB = b.dataHoraClique || 0;
-    return tB - tA;
-  });
+  const hojeInicio = new Date();
+  hojeInicio.setHours(0, 0, 0, 0);
+
+  ultimosApontamentos.sort((a, b) => (b.dataHoraClique || 0) - (a.dataHoraClique || 0));
 
   ultimosApontamentos.forEach(a => {
-    const cliente = a.clientName || "—";
-    const colaborador = a.colaboradorNome || "N/A";
-    const atividade = a.atividadeClicada || "N/A";
-    const dataHora = a.dataHoraClique ? new Date(a.dataHoraClique).toLocaleString() : "Data inválida";
-    const motivo = a.motivo || "";
+    const dataApontamento = new Date(a.dataHoraClique);
+    const ehDeHoje = dataApontamento >= hojeInicio;
 
-    if (atividade.toLowerCase() === "parado") totalParados++;
+    if (ehDeHoje) {
+        totalComApontamentoHoje++;
+        if ((a.atividadeClicada || "").toLowerCase() === "parado") {
+            totalParados++;
+        }
+    }
 
     const tr = document.createElement("tr");
 
-    // Adicionar classes CSS baseadas na atividade
-    if (atividade.toLowerCase() === "parado") {
+    if ((a.atividadeClicada || "").toLowerCase() === "parado") {
       tr.classList.add("parado-row");
-    } else if (atividade.toLowerCase() === "aguardando cliente") {
+    } else if ((a.atividadeClicada || "").toLowerCase() === "aguardando cliente") {
       tr.classList.add("aguardando-cliente-row");
     }
 
+    if (!ehDeHoje) {
+        tr.classList.add("apontamento-antigo");
+    }
+
     tr.innerHTML = `
-      <td>${cliente}</td>
-      <td>${colaborador}</td>
-      <td>${atividade}</td>
-      <td>${dataHora}</td>
-      <td>${motivo}</td>
+      <td>${a.clientName || "—"}</td>
+      <td>${a.colaboradorNome || "N/A"}</td>
+      <td>${a.atividadeClicada || "N/A"}</td>
+      <td>${a.dataHoraClique ? dataApontamento.toLocaleString() : "Data inválida"}</td>
+      <td>${a.motivo || ""}</td>
     `;
     apontamentosTabela.appendChild(tr);
   });
 
-  if (cardComApontamento) cardComApontamento.textContent = totalComApontamento;
-  if (cardSemApontamento) cardSemApontamento.textContent = TOTAL_COLABORADORES - totalComApontamento;
+  if (cardComApontamento) cardComApontamento.textContent = totalComApontamentoHoje;
+  if (cardSemApontamento) cardSemApontamento.textContent = TOTAL_COLABORADORES - totalComApontamentoHoje;
   if (cardParados) cardParados.textContent = totalParados;
   if (cardParadosContainer) cardParadosContainer.classList.toggle("alerta-parado", totalParados > 0);
 };
@@ -130,7 +135,7 @@ const atualizarGraficoPizzaHistorico = (apontamentos) => {
     
     const contagem = {};
     apontamentos.forEach(a => {
-        const atividadePadronizada = a.atividadeClicada || a.atividade;
+        const atividadePadronizada = a.atividade; 
         const duracaoSegundos = converterDuracaoParaSegundos(a.duracaoFormatada);
         if (atividadePadronizada) {
             contagem[atividadePadronizada] = (contagem[atividadePadronizada] || 0) + duracaoSegundos;
@@ -150,44 +155,19 @@ const atualizarGraficoPizzaHistorico = (apontamentos) => {
         type: 'pie',
         data: {
             labels: labels,
-            datasets: [{
-                data: data,
-                backgroundColor: backgroundColors,
-            }]
+            datasets: [{ data: data, backgroundColor: backgroundColors }]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
+            responsive: true, maintainAspectRatio: false,
             plugins: {
                 legend: { position: 'top' },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            if (context.parsed) {
-                                label += formatarTempo(context.parsed);
-                            }
-                            return label;
-                        }
-                    }
-                },
+                tooltip: { callbacks: { label: (context) => `${context.label || ''}: ${formatarTempo(context.parsed)}` } },
                 datalabels: {
                     formatter: (value, ctx) => {
-                        let sum = 0;
-                        let dataArr = ctx.chart.data.datasets[0].data;
-                        dataArr.map(data => {
-                            sum += data;
-                        });
-                        let percentage = (value * 100 / sum).toFixed(2) + "%";
-                        return percentage;
+                        const sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                        return sum > 0 ? `${(value * 100 / sum).toFixed(2)}%` : "0.00%";
                     },
-                    color: '#080808ff',
-                    font: {
-                        weight: 'bold'
-                    }
+                    color: '#080808ff', font: { weight: 'bold' }
                 }
             }
         },
@@ -198,13 +178,11 @@ const renderizarGraficoProdutividade = (apontamentos) => {
   if (!graficoProdutividadeCanvas) return;
   if (graficoProdutividade) graficoProdutividade.destroy();
 
-  const apontamentosValidos = apontamentos.filter(a => a.colaboradorNome);
   const porColaborador = {};
-  apontamentosValidos.forEach(a => {
+  apontamentos.forEach(a => {
     const col = a.colaboradorNome || "—";
-    const ativ = (a.atividadeClicada || a.atividade || "—");
+    const ativ = (a.atividade || "—");
     const seg = converterDuracaoParaSegundos(a.duracaoFormatada);
-
     if (!porColaborador[col]) {
       porColaborador[col] = {};
       ATIVIDADES.forEach(act => porColaborador[col][act] = 0);
@@ -218,15 +196,16 @@ const renderizarGraficoProdutividade = (apontamentos) => {
       return;
   }
 
-  const datasets = ATIVIDADES.map(atividade => ({
-    label: atividade,
-    data: colaboradores.map(c => porColaborador[c][atividade] || 0),
-    backgroundColor: CORES_ATIVIDADES[atividade]
-  }));
-
   graficoProdutividade = new Chart(graficoProdutividadeCanvas, {
     type: "bar",
-    data: { labels: colaboradores, datasets },
+    data: {
+        labels: colaboradores,
+        datasets: ATIVIDADES.map(atividade => ({
+            label: atividade,
+            data: colaboradores.map(c => porColaborador[c][atividade] || 0),
+            backgroundColor: CORES_ATIVIDADES[atividade]
+        }))
+    },
     options: {
       responsive: true,
       scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => formatarTempo(v) } } },
@@ -236,32 +215,26 @@ const renderizarGraficoProdutividade = (apontamentos) => {
 };
 
 // ===== Data Fetching e Event Listeners =====
-const carregarDadosDoPainel = async (dataInicioStr = null, dataFimStr = null) => {
+const carregarDadosDoPainel = (dataInicioStr = null, dataFimStr = null) => {
   limparPainelVisualmente();
   let inicio, fim;
   if (dataInicioStr && dataFimStr) {
-    inicio = new Date(dataInicioStr);
-    inicio.setHours(0, 0, 0, 0);
-    fim = new Date(dataFimStr);
-    fim.setHours(23, 59, 59, 999);
+    inicio = new Date(dataInicioStr + 'T00:00:00');
+    fim = new Date(dataFimStr + 'T23:59:59');
   } else {
     const hoje = new Date();
     inicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 0, 0, 0, 0);
     fim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59, 999);
   }
 
-  // Realtime
+  // Realtime - SEM FILTRO DE DATA, para pegar o último status de TODOS
   db.collection("apontamentos_realtime")
     .orderBy("dataHoraClique", "desc")
     .onSnapshot((snap) => {
-    if (snap.empty) {
-      renderizarStatusAtual([]);
-      return;
-    }
     const ultimosApontamentosMap = new Map();
     snap.forEach(doc => {
       const apontamento = doc.data();
-      if (!ultimosApontamentosMap.has(apontamento.colaboradorNome)) {
+      if (apontamento.colaboradorNome && !ultimosApontamentosMap.has(apontamento.colaboradorNome)) {
         ultimosApontamentosMap.set(apontamento.colaboradorNome, apontamento);
       }
     });
@@ -270,50 +243,42 @@ const carregarDadosDoPainel = async (dataInicioStr = null, dataFimStr = null) =>
     console.error("Erro ao buscar status em tempo real:", error);
   });
   
-  // Histórico
-  try {
-    const snapshot = await db.collection("apontamentos").get();
-    const apontamentosDoPeriodo = [];
-
-    snapshot.forEach(doc => {
-      const dado = doc.data();
-      const dataDocStr = dado.dataRegistro;
-      // Tratar a string de data para garantir o formato correto para Date()
-      // substitui todos os espaços ' ' por 'T'
-      
-      // CORREÇÃO: Verifica se 'dataDocStr' existe antes de tentar usar o 'replace'
-      if (dataDocStr) {
-          const dataDoc = new Date(dataDocStr.replace(/ /g, "T"));
-          if (dataDoc >= inicio && dataDoc <= fim) {
-            apontamentosDoPeriodo.push(dado);
-          }
-      }
-    });
-
-    if (apontamentosDoPeriodo.length > 0) {
-      // Guarda os dados para exportação
-      dadosDoRelatorio = apontamentosDoPeriodo;
-      atualizarGraficoPizzaHistorico(apontamentosDoPeriodo);
-      renderizarGraficoProdutividade(apontamentosDoPeriodo);
-    } else {
-      console.log("Nenhum dado histórico encontrado para os gráficos no período selecionado.");
-      // CORREÇÃO: Destruir os gráficos sem remover o elemento canvas
-      if (graficoAtividades) {
-          graficoAtividades.destroy();
-          graficoAtividades = null;
-      }
-      if (graficoProdutividade) {
-          graficoProdutividade.destroy();
-          graficoProdutividade = null;
-      }
-      // Limpar os dados exportáveis
-      dadosDoRelatorio = [];
-    }
-  } catch(error) {
-    console.error("Erro ao buscar dados históricos:", error);
+  // Histórico - AGORA EM TEMPO REAL (onSnapshot)
+  if (unsubscribeHistorico) {
+    unsubscribeHistorico();
   }
+
+  // A consulta agora é feita sem filtro de data para evitar o erro de índice do Firebase.
+  // O filtro será aplicado no navegador.
+  unsubscribeHistorico = db.collection("apontamentos")
+    .onSnapshot((snapshot) => {
+      const todosApontamentos = [];
+      snapshot.forEach(doc => {
+        todosApontamentos.push(doc.data());
+      });
+
+      // Filtra os apontamentos pelo período selecionado AQUI, no navegador.
+      const apontamentosDoPeriodo = todosApontamentos.filter(dado => {
+          if (!dado.dataRegistro) return false;
+          const dataDoc = new Date(dado.dataRegistro.replace(' ', 'T'));
+          return dataDoc >= inicio && dataDoc <= fim;
+      });
+
+      dadosDoRelatorio = apontamentosDoPeriodo;
+      if (apontamentosDoPeriodo.length > 0) {
+        atualizarGraficoPizzaHistorico(apontamentosDoPeriodo);
+        renderizarGraficoProdutividade(apontamentosDoPeriodo);
+      } else {
+        console.log("Nenhum dado histórico para os gráficos no período.");
+        if (graficoAtividades) graficoAtividades.destroy();
+        if (graficoProdutividade) graficoProdutividade.destroy();
+      }
+  }, (error) => {
+    console.error("Erro ao buscar dados históricos em tempo real:", error);
+  });
 };
 
+// ===== Funções de Exportação e Limpeza =====
 const zerarRegistrosDoBanco = () => {
   if (confirm("ATENÇÃO: Você tem certeza que deseja apagar TODOS os registros de (apontamentos_realtime) e (apontamentos)? Esta ação é irreversível.")) {
     const apontamentosRealtimeRef = db.collection("apontamentos_realtime");
@@ -348,7 +313,7 @@ const limparPainelVisualmente = () => {
     if (cardComApontamento) cardComApontamento.textContent = 0;
     if (cardSemApontamento) cardSemApontamento.textContent = TOTAL_COLABORADORES;
     if (cardParados) cardParados.textContent = 0;
-    if (apontamentosTabela) apontamentosTabela.innerHTML = "<tr><td colspan='4'>Carregando dados...</td></tr>";
+    if (apontamentosTabela) apontamentosTabela.innerHTML = "<tr><td colspan='5'>Carregando dados...</td></tr>";
     if (cardParadosContainer) cardParadosContainer.classList.remove("alerta-parado");
 };
 
@@ -362,7 +327,7 @@ const exportarProdutividadeExcel = () => {
 
     dadosDoRelatorio.forEach(a => {
         const col = a.colaboradorNome || "—";
-        const ativ = a.atividadeClicada || "—";
+        const ativ = a.atividade || "—";
         const seg = converterDuracaoParaSegundos(a.duracaoFormatada);
         if (!porColaborador[col]) {
             porColaborador[col] = {};
@@ -393,8 +358,9 @@ const exportarDetalhadoExcel = () => {
     const exportData = dadosDoRelatorio.map(a => ({
         "Cliente": a.clientName || "N/A",
         "Colaborador": a.colaboradorNome || "N/A",
-        "Atividade": a.atividadeClicada || "N/A",
-        "Data e Hora": a.dataHoraClique ? new Date(a.dataHoraClique).toLocaleString() : "Data inválida",
+        "Atividade": a.atividade || "N/A", 
+        "Duração": a.duracaoFormatada || "00:00:00",
+        "Data e Hora": a.dataRegistro || "Data inválida", 
         "Motivo": a.motivo || "N/A",
         "Localização": a.localizacao
     }));
@@ -405,24 +371,40 @@ const exportarDetalhadoExcel = () => {
 };
 
 const exportarHistoricoPdf = () => {
-    const tabelaParaImpressao = document.getElementById("tabela-apontamentos").cloneNode(true);
-    const win = window.open('', '', 'height=700,width=700');
-    win.document.write("<html><head><title>Relatório de Atividades</title>");
-    win.document.write("<style>");
-    win.document.write("body { font-family: sans-serif; }");
-    win.document.write("h1 { text-align: center; }");
-    win.document.write("table { width: 100%; border-collapse: collapse; }");
-    win.document.write("th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }");
-    win.document.write("th { background-color: #f2f2f2; }");
-    win.document.write("</style>");
-    win.document.write("</head><body>");
-    win.document.write("<h1>Relatório de Atividades</h1>");
-    win.document.write(tabelaParaImpressao.outerHTML);
-    win.document.write("</body></html>");
-    win.document.close();
-    win.print();
+    if (!dadosDoRelatorio || dadosDoRelatorio.length === 0) {
+        alert("Nenhum dado histórico encontrado no período selecionado para exportar.");
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    doc.setFontSize(18);
+    doc.text("Relatório de Histórico de Apontamentos", 14, 22);
+
+    const headers = [["Cliente", "Colaborador", "Atividade", "Duração", "Data e Hora", "Motivo"]];
+
+    const body = dadosDoRelatorio.map(a => [
+        a.clientName || "N/A",
+        a.colaboradorNome || "N/A",
+        a.atividade || "N/A",
+        a.duracaoFormatada || "00:00:00",
+        a.dataRegistro || "Data inválida",
+        a.motivo || "N/A"
+    ]);
+
+    doc.autoTable({
+        head: headers,
+        body: body,
+        startY: 30, 
+        theme: 'striped', 
+        headStyles: { fillColor: [22, 160, 133] }, 
+    });
+
+    doc.save("historico_filtrado.pdf");
 };
 
+// ===== Event Listeners (Conexão dos botões) =====
 if (btnFiltrar) {
     btnFiltrar.addEventListener("click", () => {
         const dataInicio = filtroDataInicio.value;
@@ -445,7 +427,11 @@ if (btnLimpar) {
 if (btnLimparPainel) btnLimparPainel.addEventListener("click", zerarRegistrosDoBanco);
 if (btnExportarExcel) btnExportarExcel.addEventListener("click", exportarProdutividadeExcel);
 if (btnExportarExcelDetalhado) btnExportarExcelDetalhado.addEventListener("click", exportarDetalhadoExcel);
-if (btnExportarPdf) btnExportarPdf.addEventListener("click", exportarHistoricoPdf);
+
+// CORREÇÃO DO ERRO DE DIGITAÇÃO APLICADA AQUI
+if (btnExportarPdf) {
+    btnExportarPdf.addEventListener("click", exportarHistoricoPdf);
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     carregarDadosDoPainel();
